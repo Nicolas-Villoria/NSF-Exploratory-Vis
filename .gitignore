@@ -1,2 +1,5 @@
 .mypy_cache/
 .venv/
+
+nsf_data_clean.csv
+TutorialIntroductionDataVisualizationPart3_Interaction.ipynb

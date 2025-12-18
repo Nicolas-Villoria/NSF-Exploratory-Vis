@@ -1,0 +1,7 @@
+pandas
+altair
+vega_datasets
+streamlit
+vegafusion
+vegafusion-python-embed
+ipywidgets

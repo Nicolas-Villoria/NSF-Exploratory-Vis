@@ -141,11 +141,11 @@ linked_chart = create_linked_map_and_lifecycle(
 )
 st.altair_chart(linked_chart, use_container_width=True)
 
-# ============================================================================
-# ROW 2: Directorate Evolution (left) + Termination Impact (right)
-# ============================================================================
+# ==============================================================================================
+# ROW 2: Directorate Evolution (left) + Termination Impact (right) + Political Alignment (right)
+# ==============================================================================================
 
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 
 with col1:
     st.markdown("##### Q2: Directorate Evolution")
@@ -156,12 +156,10 @@ with col2:
     st.markdown("##### Q3: Termination Impact by Directorate")
     termination_chart = create_termination_impact_chart(data['termination_impact'])
     st.altair_chart(termination_chart, use_container_width=True)
+with col3:
+    st.markdown(f"##### Q6: Political Alignment ({selected_year})")
+    political_chart = create_political_scatter(data['political_source'], selected_year)
+    st.altair_chart(political_chart, use_container_width=True)
 
-# ============================================================================
-# ROW 3: Political Analysis (full width, compact)
-# ============================================================================
 
-st.markdown(f"##### Q6: Political Alignment ({selected_year})")
-political_chart = create_political_scatter(data['political_source'], selected_year)
-st.altair_chart(political_chart, use_container_width=True)
 

@@ -570,92 +570,6 @@ def create_linked_map_and_lifecycle(grants_by_state, lifecycle_df, selected_year
     return dashboard
 
 
-def create_grants_evolution_chart(lifecycle_df, selected_states=None):
-    """Create line chart for grants evolution."""
-    if not selected_states or len(selected_states) == 0:
-        # Aggregate total
-        agg = lifecycle_df.groupby('Date', as_index=False)['Active Grants'].sum()
-        agg['State'] = 'All States'
-        
-        chart = alt.Chart(agg).mark_line(color='#1f77b4').encode(
-            x=alt.X('Date:T', axis=alt.Axis(title='Date', format='%Y-%m')),
-            y=alt.Y('Active Grants:Q', axis=alt.Axis(title='Active Grants')),
-            tooltip=[
-                alt.Tooltip('Date:T', title='Date', format='%Y-%m-%d'),
-                alt.Tooltip('Active Grants:Q', title='Grants', format=',')
-            ]
-        ).properties(
-            width=350,
-            height=180
-        ).interactive()
-    else:
-        subset = lifecycle_df[lifecycle_df['State'].isin(selected_states)].copy()
-        current_domain = [s for s in selected_states if s in STATE_COLOR_MAP]
-        current_range = [STATE_COLOR_MAP[s] for s in current_domain]
-        
-        chart = alt.Chart(subset).mark_line().encode(
-            x=alt.X('Date:T', axis=alt.Axis(title='Date', format='%Y-%m')),
-            y=alt.Y('Active Grants:Q', axis=alt.Axis(title='Active Grants')),
-            color=alt.Color('State:N', 
-                          legend=alt.Legend(title='State', orient='bottom'),
-                          scale=alt.Scale(domain=current_domain, range=current_range) if current_domain else alt.Scale()),
-            tooltip=[
-                alt.Tooltip('Date:T', format='%Y-%m-%d'),
-                alt.Tooltip('Active Grants:Q', format=','),
-                alt.Tooltip('State:N')
-            ]
-        ).properties(
-            width=350,
-            height=180
-        ).interactive()
-    
-    return chart
-
-
-# Q5: State Evolution with Termination Analysis
-
-def create_state_evolution_with_termination(df, lifecycle_df, selected_states=None):
-    """Create combined chart showing grants evolution and termination bar."""
-    # Line chart
-    line_chart = create_grants_evolution_chart(lifecycle_df, selected_states)
-    
-    # Bar chart for terminated grants
-    if not selected_states or len(selected_states) == 0:
-        total_terminated = df[df['terminated'] == True].shape[0]
-        bar_data = pd.DataFrame({'State': ['All States'], 'Terminated Grants': [total_terminated]})
-        
-        bar_chart = alt.Chart(bar_data).mark_bar(color='#d62728').encode(
-            x=alt.X('Terminated Grants:Q', axis=alt.Axis(title='Terminated')),
-            y=alt.Y('State:N', axis=alt.Axis(title='')),
-            tooltip=['State', 'Terminated Grants']
-        ).properties(width=350, height=50)
-    else:
-        all_selected_df = pd.DataFrame({'State': selected_states})
-        actual_counts = df[
-            (df['inst_state_name'].isin(selected_states)) & 
-            (df['terminated'] == True)
-        ].groupby('inst_state_name').size().reset_index(name='Terminated Grants')
-        
-        merged_counts = pd.merge(
-            all_selected_df, actual_counts, 
-            left_on='State', right_on='inst_state_name', 
-            how='left'
-        )
-        merged_counts['Terminated Grants'] = merged_counts['Terminated Grants'].fillna(0).astype(int)
-        
-        current_domain = [s for s in selected_states if s in STATE_COLOR_MAP]
-        current_range = [STATE_COLOR_MAP[s] for s in current_domain]
-        
-        bar_chart = alt.Chart(merged_counts).mark_bar().encode(
-            x=alt.X('Terminated Grants:Q', axis=alt.Axis(title='Terminated')),
-            y=alt.Y('State:N', axis=alt.Axis(title=''), sort='-x'),
-            color=alt.Color('State:N', scale=alt.Scale(domain=current_domain, range=current_range) if current_domain else alt.Scale(), legend=None),
-            tooltip=['State', 'Terminated Grants']
-        ).properties(width=350, height=max(50, 20 * len(selected_states)))
-    
-    return line_chart & bar_chart
-
-
 # Q6: Political Alignment Analysis
 
 def get_political_alignment(row):
@@ -714,7 +628,7 @@ def prepare_political_data(df, political_df):
     return source_df
 
 
-def create_political_scatter(source_df, selected_year):
+def create_political_scatter(source_df, selected_year, highlight_state=None):
     """Create Gapminder-style scatter plot for political analysis with hover trail."""
     year_data = source_df[source_df['year'] == selected_year].copy()
     
@@ -773,6 +687,13 @@ def create_political_scatter(source_df, selected_year):
         color=alt.Color('political_alignment:N', scale=party_colors, legend=None),
         opacity=when_hover.then(alt.value(1)).otherwise(alt.value(0))
     )
+
+    # Opacity for main points (highlighted state)
+    opacity = (
+    alt.when(when_hover, highlight_state is not None)
+    .then(alt.value(0.9))
+    .otherwise(alt.value(0.25))
+)
     
     # Main points for current year
     points_chart = alt.Chart(year_data).mark_circle(size=100).encode(
@@ -780,7 +701,7 @@ def create_political_scatter(source_df, selected_year):
         y=alt.Y('total_funding_millions:Q', scale=alt.Scale(zero=False), title='Funding ($M)'),
         color=alt.Color('political_alignment:N', scale=party_colors, title='Party',
                        legend=alt.Legend(orient='top')),
-        opacity=when_hover.then(alt.value(1)).otherwise(alt.value(0.5)),
+        opacity=opacity,
         tooltip=[
             alt.Tooltip('State:N', title='State'),
             alt.Tooltip('active_grants:Q', title='Grants', format=','),

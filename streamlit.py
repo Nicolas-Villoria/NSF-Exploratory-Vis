@@ -13,14 +13,10 @@ from analysis_functions import (
     load_political_data,
     prepare_grants_by_state_data,
     prepare_directorate_data,
-    create_directorate_evolution_chart,
     prepare_termination_impact_data,
-    create_termination_impact_chart,
-    prepare_lifecycle_data,
     prepare_lifecycle_data_with_statecode,
-    create_linked_map_and_lifecycle,
     prepare_political_data,
-    create_political_scatter
+    final_vis
 )
 
 # Page configuration
@@ -48,35 +44,6 @@ st.markdown("""
     .stMetric {padding: 0.3rem !important;}
 </style>
 """, unsafe_allow_html=True)
-
-# ============================================================================
-# DATA LOADING (cached)
-# ============================================================================
-
-@st.cache_data
-def get_data():
-    """Load and cache all data."""
-    df = load_data()
-    political_df = load_political_data()
-    grants_by_state = prepare_grants_by_state_data(df)
-    directorate_data = prepare_directorate_data(df)
-    termination_impact = prepare_termination_impact_data(df)
-    lifecycle_df = prepare_lifecycle_data(df)
-    lifecycle_df_linked = prepare_lifecycle_data_with_statecode(df)
-    political_source = prepare_political_data(df, political_df)
-    
-    return {
-        'df': df,
-        'grants_by_state': grants_by_state,
-        'directorate_data': directorate_data,
-        'termination_impact': termination_impact,
-        'lifecycle_df': lifecycle_df,
-        'lifecycle_df_linked': lifecycle_df_linked,
-        'political_source': political_source
-    }
-
-# Load data
-data = get_data()
 
 # ============================================================================
 # SIDEBAR CONTROLS
@@ -126,40 +93,46 @@ st.sidebar.markdown("---")
 st.sidebar.caption("NSF grants 2020-2025 | By Nicolás Villoria & Oriol Fontanals")
 
 # ============================================================================
+# DATA LOADING (cached)
+# ============================================================================
+
+@st.cache_data
+def get_data():
+    """Load and cache all data."""
+    df = load_data()
+    political_df = load_political_data()
+    grants_by_state = prepare_grants_by_state_data(df)
+    directorate_data = prepare_directorate_data(df)
+    termination_impact_df = prepare_termination_impact_data(df)
+    lifecycle_df = prepare_lifecycle_data_with_statecode(df)
+    political_source_df = prepare_political_data(df, political_df)
+    
+    return {
+        'df': df,
+        'grants_by_state': grants_by_state,
+        'directorate_data': directorate_data,
+        'termination_impact_df': termination_impact_df,
+        'lifecycle_df': lifecycle_df,
+        'political_source_df': political_source_df
+    }
+
+# Load data
+data = get_data()
+
+# ============================================================================
 # MAIN CONTENT - COMPACT GRID LAYOUT
 # ============================================================================
 
-# ============================================================================
-# ROW 1: Linked Map + Lifecycle Chart (full width)
-# ============================================================================
-
-st.markdown(f"##### Q1 & Q4-5: Grants by State ({selected_year}) - click to filter, shift+click multi-select, double-click reset")
-linked_chart = create_linked_map_and_lifecycle(
-    data['grants_by_state'], 
-    data['lifecycle_df_linked'],
+# Generate final visualization based on selected year
+final_chart = final_vis(
+    data['df'],
+    data['grants_by_state'],
+    data['lifecycle_df'],
+    data['directorate_data'],
+    data['termination_impact_df'],
+    data['political_source_df'],
     selected_year
 )
-st.altair_chart(linked_chart, use_container_width=True)
+st.altair_chart(final_chart, use_container_width=True)
 
-# ==============================================================================================
-# ROW 2: Directorate Evolution (left) + Termination Impact (right) + Political Alignment (right)
-# ==============================================================================================
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.markdown("##### Q2: Directorate Evolution")
-    evolution_chart = create_directorate_evolution_chart(data['directorate_data'])
-    st.altair_chart(evolution_chart, use_container_width=True)
-
-with col2:
-    st.markdown("##### Q3: Termination Impact by Directorate")
-    termination_chart = create_termination_impact_chart(data['termination_impact'])
-    st.altair_chart(termination_chart, use_container_width=True)
-with col3:
-    st.markdown(f"##### Q6: Political Alignment ({selected_year})")
-    political_chart = create_political_scatter(data['political_source'], selected_year)
-    st.altair_chart(political_chart, use_container_width=True)
-
-
-
+# ============================================================================

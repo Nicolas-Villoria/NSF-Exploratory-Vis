@@ -1,7 +1,8 @@
-pandas
-altair
+pandas>=1.4.0
+altair>=5.0.0
 vega_datasets
 streamlit
-vegafusion
-vegafusion-python-embed
+vegafusion>=1.0.0
+vegafusion-python-embed>=1.0.0
 ipywidgets
+vl-convert-python>=1.6.0

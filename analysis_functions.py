@@ -146,6 +146,22 @@ STATE_LOOKUP_DATA = [
 
 EAST_COAST_STATES = ['NH', 'MA', 'RI', 'NJ', 'DE', 'DC']
 
+directorate_colors = {
+    'MPS': '#1f77b4',
+    'CSE': '#E69F00',
+    'ENG': '#009E73',
+    'GEO': '#D55E00',
+    'EDU': '#F0E442',
+    'BIO': '#7F6A3A',
+    'TIP': '#CC79A7',
+    'SBE': '#56B4E9',
+    'O/D': '#999999',
+}
+
+DIR_DOMAIN = ['MPS','CSE','ENG','GEO','EDU','BIO','TIP','SBE','O/D']
+DIR_RANGE  = [directorate_colors[k] for k in DIR_DOMAIN]
+DIR_SCALE  = alt.Scale(domain=DIR_DOMAIN, range=DIR_RANGE)
+
 
 # Q1: Grants Distribution by State
 
@@ -264,7 +280,7 @@ def create_choropleth_map(year_data, selected_year, min_grants, max_grants, stat
     # Combine all layers
     map_chart = (choropleth + leader_lines + state_labels + pr_circle).properties(
         width=MAP_WIDTH,
-        height=250,
+        height=230,
         title='Grants Distribution by State'
     )
     
@@ -310,35 +326,67 @@ def prepare_directorate_data(df):
 
 def create_directorate_evolution_chart(directorate_data):
     """Create line chart showing evolution of grants by directorate."""
-    # Filter to main directorates and exclude "All years"
-    main_directorates = ['MPS', 'CSE', 'ENG', 'GEO', 'EDU', 'BIO', 'TIP', 'SBE', 'O/D']
-    filtered_data = directorate_data[
-        (directorate_data['directorate'].isin(main_directorates)) &
-        (directorate_data['year'] != 'All years')
-    ].copy()
-    filtered_data['year'] = filtered_data['year'].astype(int)
-    
-    line = alt.Chart(filtered_data).mark_line(
+    # Create a selection that chooses the nearest point based on year
+    nearest = alt.selection_point(
+        nearest=True,
+        on='mouseover',
+        fields=['year'],
+        empty=False
+    )
+
+    # The basic line chart
+    line = alt.Chart(directorate_data).mark_line(
         interpolate='monotone',
-        strokeWidth=2,
-        point=True
+        strokeWidth=2
     ).encode(
-        x=alt.X('year:Q', title='Year', axis=alt.Axis(format='d', labelAngle=0)),
-        y=alt.Y('num_grants:Q', title='Active Grants'),
-        color=alt.Color('directorate:N', title='Dir.', scale=alt.Scale(scheme='category10'),
-                       legend=alt.Legend(orient='right', columns=1)),
-        tooltip=[
-            alt.Tooltip('directorate:N', title='Directorate'),
-            alt.Tooltip('year:Q', title='Year'),
-            alt.Tooltip('num_grants:Q', title='Grants', format=',')
-        ]
+        x=alt.X('year:Q', title='Year', axis=alt.Axis(format='d')),
+        y=alt.Y('num_grants:Q', title='Number of Active Grants', scale=alt.Scale(domain=[0, 16000])),
+        color=alt.Color(
+            'directorate:N',
+            title='Directorate',
+            scale=DIR_SCALE, legend=alt.Legend(title='Directorate', orient='bottom', offset=-5)
+        )
+    )
+
+    # Transparent selectors across the chart
+    selectors = alt.Chart(directorate_data).mark_point().encode(
+        x='year:Q',
+        opacity=alt.value(0),
+    ).add_params(nearest)
+
+    # Draw points on the lines, and highlight based on selection
+    points = line.mark_point(size=80).encode(
+        opacity=alt.condition(nearest, alt.value(1), alt.value(0))
+    )
+
+    # Draw text labels near the points, and highlight based on selection
+    text = line.mark_text(
+        align='left',
+        dx=10,
+        dy=0,
+        fontSize=11
+    ).encode(
+        text=alt.condition(nearest, 'num_grants:Q', alt.value(' '))
+    )
+
+    # Draw a vertical rule at the location of the selection
+    rules = alt.Chart(directorate_data).mark_rule(
+        color='gray',
+        strokeWidth=1
+    ).encode(
+        x='year:Q',
+    ).transform_filter(nearest)
+
+    # Combine all layers
+    q2_grants_per_dir_chart = alt.layer(
+        line, selectors, points, rules, text
     ).properties(
         width=CHART_WIDTH,
-        height=CHART_HEIGHT,
-        title='Directorate Evolution'
+        height=255,
+        title=alt.TitleParams('Evolution of Number of Active Grants by Directorate', color='black', fontSize=16, anchor='middle', align='center')
     )
-    
-    return line
+
+    return q2_grants_per_dir_chart
 
 
 # Q3: Termination Impact Analysis
@@ -376,71 +424,98 @@ def prepare_termination_impact_data(df):
 def create_termination_impact_chart(termination_impact_df):
     """Create bar chart for termination impact."""
     
-    chart = alt.Chart(termination_impact_df).mark_bar().encode(
-        x=alt.X('directorate:N', sort='-y', title='Directorate', axis=alt.Axis(labelAngle=-45)),
-        y=alt.Y(f'terminated_grants:Q', title='Terminated'),
-        color=alt.Color('directorate:N', legend=None, scale=alt.Scale(scheme='tableau10')),
+    q3_termination_impact_chart = alt.Chart(termination_impact_df).mark_bar().encode(
+        x=alt.X(
+            'directorate:N',
+            sort='-y',
+            title='Directorate',
+            axis=alt.Axis(labelAngle=-45)
+        ),
+        y=alt.Y(
+            'terminated_grants:Q',
+            title='Value'
+        ),
+        color=alt.Color('directorate:N', scale=DIR_SCALE, title='Directorate', legend=alt.Legend(title='Directorate', orient='bottom'))
+        ,
         tooltip=[
             alt.Tooltip('directorate:N', title='Directorate'),
-            alt.Tooltip('active_grants_2025:Q', title='Active (2025)', format=','),
-            alt.Tooltip('terminated_grants:Q', title='Terminated', format=','),
-            alt.Tooltip('termination_pct:Q', title='Rate (%)', format='.2f')
+            alt.Tooltip('active_grants_2025:Q', title='Active Grants (2025)', format=','),
+            alt.Tooltip('terminated_grants:Q', title='Terminated Grants (2025)', format=','),
+            alt.Tooltip('termination_pct:Q', title='Termination Rate (%)', format='.2f')
         ]
     ).properties(
         width=CHART_WIDTH,
         height=CHART_HEIGHT,
-        title='Termination Impact by Directorate'
+        title=alt.TitleParams('Grant Termination Impact by Directorate in 2025', color='black', fontSize=16, anchor='middle', align='center')
     )
-    
-    return chart
+
+    return q3_termination_impact_chart
 
 
 # Q4: Grants Lifecycle Analysis
 
 def prepare_lifecycle_data_with_statecode(df):
-    """Prepare monthly lifecycle data with state codes for linked map selection."""
+    """Prepare daily lifecycle data using vectorized operations."""
+    # Ensure datetime format
     df = df.copy()
+    # Note: dates are already converted in load_data, but ensuring consistency
     
-    # Cap terminated grants at end of 2025
-    mask_terminated = (df['terminated'] == True)
-    mask_exceeds = df['awd_exp_date'] > pd.Timestamp('2025-12-31')
-    df.loc[mask_terminated & mask_exceeds, 'awd_exp_date'] = pd.Timestamp('2025-12-31')
-    df = df.dropna(subset=['awd_eff_date', 'awd_exp_date', 'inst_state_name', 'inst_state_code'])
+    clean_df = df.dropna(subset=['awd_eff_date', 'awd_exp_date', 'inst_state_name', 'inst_state_code']).copy()
+    clean_df = clean_df[clean_df['awd_eff_date'] <= clean_df['awd_exp_date']]
+
+    # Create events DataFrame
+    starts = clean_df[['awd_eff_date', 'inst_state_name']].rename(columns={'awd_eff_date': 'date'})
+    starts['change'] = 1
+
+    ends = clean_df[['awd_exp_date', 'inst_state_name']].copy()
+    ends['date'] = ends['awd_exp_date'] + pd.Timedelta(days=1)
+    ends = ends.drop(columns=['awd_exp_date'])
+    ends['change'] = -1
+
+    # Combine and reshape
+    all_events = pd.concat([starts, ends], ignore_index=True)
+    daily_changes = all_events.groupby(['date', 'inst_state_name'])['change'].sum().unstack(fill_value=0)
+
+    # Resample and Calculate
+    # Use daily resolution 
+    daily_changes = daily_changes.resample('D').sum().fillna(0)
+    active_counts_by_state = daily_changes.cumsum()
     
-    events_start = df[['awd_eff_date', 'inst_state_name', 'inst_state_code']].rename(columns={'awd_eff_date': 'Date'})
-    events_start['Change'] = 1
-    events_end = df[['awd_exp_date', 'inst_state_name', 'inst_state_code']].copy()
-    events_end['Date'] = events_end['awd_exp_date'] + pd.Timedelta(days=1)
-    events_end = events_end.drop(columns=['awd_exp_date'])
-    events_end['Change'] = -1
+    # Add Allstates column
+    active_counts_by_state['Allstates'] = active_counts_by_state.sum(axis=1)
+
+    # Filter for required date range: 2020-01-01 to 2026 
+    start_date = pd.Timestamp('2020-01-01')
+    end_date = pd.Timestamp('2026-01-01') 
+    active_counts_by_state = active_counts_by_state.loc[start_date:end_date]
+
+    # Melt to Long Format
+    active_counts_long = active_counts_by_state.reset_index().melt(
+        id_vars=['date'],
+        var_name='inst_state_name',
+        value_name='active_grants'
+    )
+
+    # Get state codes for the chart selection
+    # We need to preserve inst_state_code for the 'state' column used in selection
+    id_map = clean_df[['inst_state_name', 'inst_state_code']].drop_duplicates()
     
-    # Combine start and end events
-    daily_changes = pd.concat([events_start, events_end]).groupby(['inst_state_name', 'inst_state_code', 'Date'])['Change'].sum().reset_index()
-    daily_changes = daily_changes.sort_values(['inst_state_name', 'Date'])
+    # Merge to get the codes
+    active_counts_long = active_counts_long.merge(id_map, on='inst_state_name', how='left')
     
-    lifecycle_rows = []
-    unique_states = daily_changes[['inst_state_name', 'inst_state_code']].drop_duplicates()
-    # Use MONTHLY frequency for better performance
-    full_date_range = pd.date_range(start=daily_changes['Date'].min(), end=daily_changes['Date'].max(), freq='MS')
+    # Handle Allstates code
+    active_counts_long.loc[active_counts_long['inst_state_name'] == 'Allstates', 'inst_state_code'] = 'Allstates'
+
+    # Rename columns to match create_lifecycle_line_chart expectations
+    # Expected: Date, State, state_code, Active Grants
+    active_counts_long = active_counts_long.rename(columns={
+        'date': 'Date',
+        'inst_state_name': 'State',
+        'inst_state_code': 'state_code',
+        'active_grants': 'Active Grants'
+    })
     
-    for _, row in unique_states.iterrows():
-        state_name = row['inst_state_name']
-        state_code = row['inst_state_code']
-        state_data = daily_changes[daily_changes['inst_state_name'] == state_name].copy()
-        state_data = state_data.groupby('Date')['Change'].sum().reset_index()
-        state_data = state_data.set_index('Date').reindex(full_date_range).fillna(0)
-        state_data['Active Grants'] = state_data['Change'].cumsum()
-        state_data = state_data.reset_index().rename(columns={'index': 'Date'})
-        state_data['State'] = state_name
-        state_data['state_code'] = state_code
-        
-        first_nonzero = state_data[state_data['Active Grants'] > 0].index.min()
-        if pd.notna(first_nonzero):
-            state_data = state_data.loc[first_nonzero:]
-        
-        lifecycle_rows.append(state_data[['Date', 'State', 'state_code', 'Active Grants']])
-    
-    return pd.concat(lifecycle_rows, ignore_index=True)
+    return active_counts_long
 
 
 def create_lifecycle_line_chart(lifecycle_df, state_selection):
@@ -457,20 +532,134 @@ def create_lifecycle_line_chart(lifecycle_df, state_selection):
     lifecycle_df_renamed = lifecycle_df.copy()
     lifecycle_df_renamed['state'] = lifecycle_df_renamed['state_code']
     
-    lifecycle_line = alt.Chart(lifecycle_df_renamed).mark_line(strokeWidth=1.5).encode(
-        x=alt.X('Date:T', axis=alt.Axis(title='Date', format='%Y-%m')),
-        y=alt.Y('Active Grants:Q', axis=alt.Axis(title='Active Grants')),
-        color=alt.Color('state:N', legend=None),
-        opacity=alt.condition(state_selection, alt.value(1), alt.value(0)),
-        strokeWidth=alt.condition(state_selection, alt.value(2.5), alt.value(0)),
-        tooltip=['state:N', 'Date:T', 'Active Grants:Q']
+    # Dynamic Y scale based on selection status
+    y_scale = alt.Scale(
+        domainRaw=alt.expr("length(data('state_select_store')) > 0 ? [0, 6000] : [0, 60000]"),
+        nice=False
+    )
+    
+    # Tick values every 4 months
+    tick_values = [x for x in pd.date_range(start='2020-01-01', end='2026-01-01', freq='4MS')]
+
+    # Common axis
+    x_axis = alt.X(
+        "Date:T", 
+        axis=alt.Axis(
+            title="Date", 
+            format="%b %Y", 
+            values=tick_values,
+            labelAngle=-45
+        )
+    )
+    y_axis = alt.Y("Active Grants:Q", scale=y_scale, axis=alt.Axis(title="Active Grants"))
+    
+    # All-states line (only when nothing selected)
+    all_layer = (
+        alt.Chart(lifecycle_df_renamed)
+        .mark_line(color="#1f77b4")
+        .encode(
+            x=x_axis,
+            y=y_axis,
+            tooltip=[
+                alt.Tooltip("Date:T", title="Date", format='%b %d, %Y'),
+                alt.Tooltip("State:N", title="State"),
+                alt.Tooltip("Active Grants:Q", title="Number of active grants"),
+            ],
+        )
+        .transform_filter("length(data('state_select_store')) == 0")
+        .transform_filter(alt.datum.State == 'Allstates')
+    )
+
+    all_label = (
+        alt.Chart(lifecycle_df_renamed)
+        .transform_filter("length(data('state_select_store')) == 0")
+        .transform_filter(alt.datum.State == 'Allstates')
+        .transform_window(
+            sort=[alt.SortField("Date", order="descending")],
+            rank="rank()",
+        )
+        .transform_filter(alt.datum.rank == 1)
+        .mark_text(align="left", dx=6, fontSize=11, color="#1f77b4")
+        .encode(
+            x=alt.X("Date:T", axis=alt.Axis(title="Date", format="%b %Y", values=tick_values, labelAngle=-45)),
+            y="Active Grants:Q",
+            text=alt.value("All states"),
+        )
+    )
+
+    # Hover selection for highlighting specific state line
+    hover_state = alt.selection_point(
+        name="hover_state",
+        fields=["State"],
+        on="mouseover",
+        clear="mouseout",
+        empty="none",
+    )
+
+    # Base chart for selected states only
+    selected_base = (
+        alt.Chart(lifecycle_df_renamed)
+        .transform_filter("length(data('state_select_store')) > 0")
+        .transform_filter(state_selection)
+        .transform_filter(alt.datum.State != 'Allstates')
+    )
+
+    # Selected lines: dim all, highlight hovered
+    selected_lines = (
+        selected_base
+        .mark_line()
+        .encode(
+            x=x_axis,
+            y=y_axis,
+            detail="State:N",
+            color=alt.condition(hover_state, alt.value("#FFC067"), alt.value("#74a3cc")),
+            strokeWidth=alt.condition(hover_state, alt.value(3), alt.value(1.75)),
+            opacity=alt.condition(hover_state, alt.value(1), alt.value(1)),
+            tooltip=[
+                alt.Tooltip("Date:T", title="Date", format='%b %d, %Y'),
+                alt.Tooltip("State:N", title="State"),
+                alt.Tooltip("Active Grants:Q", title="Number of active grants"),
+            ],
+        )
+        .add_params(hover_state)
+    )
+
+    # End-of-line labels
+    end_labels = (
+        selected_base
+        .transform_window(
+            sort=[alt.SortField("Date", order="descending")],
+            rank="rank()",
+            groupby=["State"],
+        )
+        .transform_filter(alt.datum.rank == 1)
+        .mark_text(align="left", dx=6, fontSize=11)
+        .encode(
+            x="Date:T",
+            y="Active Grants:Q",
+            text="State:N",
+            opacity=alt.value(1),
+            color=alt.condition(hover_state, alt.value("#FFC067"), alt.value("#74a3cc")),
+        )
+    )
+
+    # Dynamic title
+    title_expr = alt.expr(
+        "length(data('state_select_store')) > 0 ? "
+        "'Evolution of number of active grants from 2020-2025 for selected states' : "
+        "'Evolution of number of active grants from 2020-2025 for all states'"
+    )
+
+    # Combine selected layers
+    chart = (all_layer + all_label + selected_lines + end_labels).add_params(
+        state_selection
     ).properties(
+        title=alt.TitleParams(text=title_expr, fontSize=16, anchor="middle", align="center"),
         width=CHART_WIDTH,
         height=CHART_HEIGHT,
-        title='Grant Lifecycle by State'
-    ).interactive()
+    )
     
-    return lifecycle_line
+    return chart
 
 
 # Q5: Bar Chart of Terminated Grants by State
@@ -485,23 +674,71 @@ def create_terminated_bar_chart(terminated_data, state_selection):
     Returns:
         Altair chart object
     """
-    terminated_bar = alt.Chart(terminated_data).mark_bar(color='#d62728').encode(
-        x=alt.X('terminated_grants:Q', title='Terminated Grants'),
-        y=alt.Y('state:N', sort='-x', title='', axis=alt.Axis(labelFontSize=9)),
-        opacity=alt.condition(state_selection, alt.value(1), alt.value(0.3)),
-        tooltip=[
-            alt.Tooltip('state:N', title='State'),
-            alt.Tooltip('state_name:N', title='State Name'),
-            alt.Tooltip('terminated_grants:Q', title='Terminated', format=','),
-            alt.Tooltip('termination_pct:Q', title='Rate (%)', format='.2f')
-        ]
-    ).properties(
-        width=CHART_WIDTH,
-        height=CHART_HEIGHT,
-        title='Terminated Grants by State'
+    # Renaming for consistency with other charts
+    chart_data = terminated_data.rename(columns={'terminated_grants': 'Count', 'state_name': 'State'})
+
+    # Dynamic x scale
+    x_scale = alt.Scale(
+        domainRaw=alt.expr("length(data('state_select_store')) > 0 ? [0, 300] : [0, 2500]"),
+        nice=False
+    )
+
+    y_sorted = alt.Y(
+        "State:N",
+        title=None,
+        sort=alt.EncodingSortField(
+            field="Count",
+            op="max",
+            order="descending"
+        ),
+        axis=alt.Axis(labelFontSize=9)
+    )
+
+    # Layer A: All States
+    all_layer = (
+        alt.Chart(chart_data)
+        .mark_bar(color="#1f77b4")
+        .encode(
+            x=alt.X("Count:Q", title="Number of Terminated Grants", scale=x_scale),
+            y=y_sorted,
+            tooltip=[
+                alt.Tooltip("State:N", title="State"),
+                alt.Tooltip("Count:Q", title="Number of Terminated Grants"),
+            ],
+        )
+        .transform_filter("length(data('state_select_store')) == 0")
+        .transform_filter("datum.State == 'All States'")
     )
     
-    return terminated_bar
+    # Layer B: Selected states
+    selected_layer = (
+        alt.Chart(chart_data)
+        .mark_bar()
+        .encode(
+            x=alt.X("Count:Q", title="Number of Terminated Grants", scale=x_scale),
+            y=y_sorted,
+            color=alt.value("#74a3cc"),
+            tooltip=[
+                alt.Tooltip("State:N", title= "State") ,
+                alt.Tooltip("Count:Q", title="Number of Terminated Grants"),
+            ],
+        )
+        .transform_filter("length(data('state_select_store')) > 0")
+        .transform_filter(state_selection)
+        .transform_filter("datum.State != 'All States'")
+    )
+
+    title_expr = alt.expr("length(data('state_select_store')) > 0 ? 'Number of terminated grants for the selected states' : 'Number of terminated grants for all states'")
+
+    chart = (all_layer + selected_layer).properties(
+        title=alt.TitleParams(text=title_expr, fontSize=16, anchor="middle", align="center"),
+        width=CHART_WIDTH,
+        height=CHART_HEIGHT
+    ).add_params(
+        state_selection
+    )
+    
+    return chart
 
 
 # Q6: Political Alignment Analysis
@@ -564,103 +801,121 @@ def prepare_political_data(df, political_df):
 
 def create_political_scatter(source_df, selected_year):
     """Create Gapminder-style scatter plot for political analysis with hover trail."""
-    year_data = source_df[source_df['year'] == selected_year].copy()
     
-    party_colors = alt.Scale(domain=['Democrat', 'Republican'], range=['#2166ac', '#b2182b'])
-    
-    # Hover selection parameter
-    hover = alt.selection_point(
-        fields=['State'],
-        on='mouseover',
-        empty=False
+    # Controls
+    hover = alt.selection_point(on="mouseover", fields=["State"], empty=False)
+    hover_point_opacity = alt.selection_point(on="mouseover", fields=["State"])
+
+    party_colors = alt.Scale(domain=["Democrat", "Republican"], range=["#2166ac", "#b2182b"])
+
+    # Base chart (uses all years data for trails)
+    base = (
+        alt.Chart(source_df)
+        .encode(
+            x=alt.X("active_grants:Q", scale=alt.Scale(zero=False), title="Number of Active Grants"),
+            y=alt.Y("total_funding_millions:Q", scale=alt.Scale(zero=False), title="Total Funding (Millions $)"),
+            color=alt.Color(
+                "political_alignment:N",
+                scale=party_colors,
+                title="Political Alignment",
+                legend=alt.Legend(orient="bottom", titleFontSize=12, labelFontSize=10, symbolStrokeWidth=6),
+            ),
+            detail="State:N",
+        )
+        .interactive()
     )
-    
+
+    # Opacity logic (dim valid points if not hovered)
+    opacity = (
+        alt.when(hover_point_opacity)
+        .then(alt.value(0.7))
+        .otherwise(alt.value(0.25))
+    )
+
+    # Points filtered by selected_year
+    visible_points = (
+        base.mark_circle(size=200)
+        .encode(
+            opacity=opacity,
+            tooltip=[
+                alt.Tooltip("State:N", title="State"),
+                alt.Tooltip("active_grants:Q", title="Active Grants", format=","),
+                alt.Tooltip("total_funding_millions:Q", title="Total Funding ($M)", format=",.1f"),
+                alt.Tooltip("terminated_grants:Q", title="Terminated Grants"),
+                alt.Tooltip("termination_pct:Q", title="Termination %", format=".2f"),
+            ],
+        )
+        .transform_filter(alt.datum.year == selected_year)
+        .add_params(hover, hover_point_opacity)
+    )
+
+    # Hover trail effect
     when_hover = alt.when(hover)
 
-    # Base chart for trails (all years data)
-    base = alt.Chart(source_df).encode(
-        x=alt.X('active_grants:Q', scale=alt.Scale(zero=False)),
-        y=alt.Y('total_funding_millions:Q', scale=alt.Scale(zero=False)),
-        detail='State:N'
-    )
-    
-    # Hover trail - line connecting all years for hovered state
-    trail_line = base.mark_trail().encode(
-        order=alt.Order('year:Q', sort='ascending'),
-        size=alt.Size('year:Q',
-                      scale=alt.Scale(domain=[2020, 2025], range=[2, 20]),
-                      legend=None),
-        opacity=when_hover.then(alt.value(0.5)).otherwise(alt.value(0)),
-        color=alt.value('#444444')
-    )
-    
-    # Trail points
-    trail_points = base.mark_point(size=100).encode(
-        opacity=when_hover.then(alt.value(0.8)).otherwise(alt.value(0)),
-        color=alt.value('#444444')
+    hover_line = alt.layer(
+        base.mark_trail().encode(
+            order=alt.Order("year:Q", sort="ascending"),
+            size=alt.Size("year:Q", scale=alt.Scale(domain=[2020, 2025], range=[2, 20]), legend=None),
+            opacity=when_hover.then(alt.value(0.5)).otherwise(alt.value(0)),
+            color=alt.value("#444444"),
+        ),
+        base.mark_point(size=120).encode(
+            opacity=when_hover.then(alt.value(0.9)).otherwise(alt.value(0)),
+        ),
     )
 
     # Year labels on hover trail
-    year_labels = base.mark_text(align='left', dx=10, dy=-10, fontSize=11, fontWeight='bold').encode(
-        text='year:O',
-        color=alt.value('#333333'),
-        opacity=when_hover.then(alt.value(1)).otherwise(alt.value(0))
+    year_labels = (
+        base.mark_text(align="left", dx=12, dy=-12, fontSize=12, fontWeight="bold")
+        .encode(
+            text="year:O",
+            color=alt.value("#333333"),
+            opacity=when_hover.then(alt.value(1)).otherwise(alt.value(0)),
+        )
+        .transform_filter(hover)
     )
 
-    # State label on hover (only for current year point)
-    state_labels = alt.Chart(year_data).mark_text(
-        align='left',
-        dx=-15,
-        dy=-25,
-        fontSize=14,
-        fontWeight='bold'
-    ).encode(
-        x='active_grants:Q',
-        y='total_funding_millions:Q',
-        text='State:N',
-        color=alt.Color('political_alignment:N', scale=party_colors, legend=None),
-        opacity=when_hover.then(alt.value(1)).otherwise(alt.value(0))
+    # State labels at current year (filtered)
+    state_labels = (
+        alt.Chart(source_df)
+        .mark_text(align="left", dx=-20, dy=-35, fontSize=18, fontWeight="bold")
+        .encode(
+            x="active_grants:Q",
+            y="total_funding_millions:Q",
+            text="State:N",
+            color=alt.Color("political_alignment:N", scale=party_colors),
+            opacity=when_hover.then(alt.value(1)).otherwise(alt.value(0)),
+        )
+        .transform_filter(alt.datum.year == selected_year)
     )
-
-    # Main points for current year
-    points_chart = alt.Chart(year_data).mark_circle(size=100).encode(
-        x=alt.X('active_grants:Q', scale=alt.Scale(zero=False), title='Active Grants'),
-        y=alt.Y('total_funding_millions:Q', scale=alt.Scale(zero=False), title='Funding ($M)'),
-        color=alt.Color('political_alignment:N', scale=party_colors, title='Party',
-                       legend=alt.Legend(orient='top')),
-        opacity=when_hover.then(alt.value(0.9)).otherwise(alt.value(0.6)),
-        tooltip=[
-            alt.Tooltip('State:N', title='State'),
-            alt.Tooltip('active_grants:Q', title='Grants', format=','),
-            alt.Tooltip('total_funding_millions:Q', title='Funding ($M)', format=',.1f'),
-            alt.Tooltip('terminated_grants:Q', title='Terminated'),
-            alt.Tooltip('political_alignment:N', title='Party')
-        ]
-    ).add_params(hover)
 
     # Background year text
-    background_year = alt.Chart(pd.DataFrame({'year': [selected_year]})).mark_text(
-        baseline='middle',
-        fontSize=150,
-        opacity=0.1,
-        fontWeight='bold',
-        color='#888888'
-    ).encode(
-        text='year:O'
+    background_year = (
+        alt.Chart(pd.DataFrame({'year': [selected_year]}))
+        .mark_text(
+            baseline="middle",
+            fontSize=120,
+            fontWeight="bold",
+            color="#9e9e9e",
+            opacity=0.3,
+            text=str(selected_year)
+        )
     )
-    
+
     # Combine all layers
-    final_chart = alt.layer(
-        background_year,
-        trail_line,
-        trail_points,
-        year_labels,
-        points_chart,
-        state_labels
-    ).properties(
-        width=MAP_WIDTH,
-        height=MAP_HEIGHT,
-        title='Political Alignment Analysis'
+    final_chart = (
+        alt.layer(background_year, hover_line, visible_points, year_labels, state_labels)
+        .properties(
+            width=MAP_WIDTH,
+            height=MAP_HEIGHT,
+            title=alt.TitleParams(
+                text="NSF Grants by State: Political Alignment Analysis",
+                fontSize=16,
+                anchor="middle",
+                align="center",
+                offset=10
+            ),
+        )
     )
     
     return final_chart
@@ -678,8 +933,8 @@ def final_vis(df, grants_by_state, lifecycle_df, directorate_data, termination_i
         political_source_df: Political data from prepare_political_data()
         selected_year: Year to display on the choropleth (from sidebar)
     """
-    alt.data_transformers.enable('default')
-    alt.data_transformers.disable_max_rows()
+    alt.data_transformers.enable('vegafusion')
+    # alt.data_transformers.disable_max_rows() # VegaFusion handles large data automatically
 
     # Filter data for selected year
     year_data = grants_by_state[grants_by_state['year'] == selected_year].copy()
@@ -710,6 +965,17 @@ def final_vis(df, grants_by_state, lifecycle_df, directorate_data, termination_i
     # 5. TERMINATED GRANTS BAR CHART (Left of map, linked to selection)
     # Filter to only states with terminated grants > 0 and sort by terminated_grants
     terminated_data = year_data[year_data['terminated_grants'] > 0].copy()
+    
+    # Add All States total
+    total_terminated = terminated_data['terminated_grants'].sum()
+    all_states_row = pd.DataFrame([{
+        'state_name': 'All States',
+        'state': 'All States',  # For consistency
+        'terminated_grants': total_terminated,
+        'id': -1
+    }])
+    terminated_data = pd.concat([terminated_data, all_states_row], ignore_index=True)
+    
     terminated_data = terminated_data.sort_values('terminated_grants', ascending=True)
     terminated_bar = create_terminated_bar_chart(terminated_data, state_selection)
 

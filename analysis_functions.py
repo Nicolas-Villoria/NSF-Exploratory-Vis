@@ -153,12 +153,12 @@ directorate_colors = {
     'GEO': '#D55E00',
     'EDU': '#F0E442',
     'BIO': '#7F6A3A',
-    'TIP': '#CC79A7',
     'SBE': '#56B4E9',
+    'TIP': '#CC79A7',
     'O/D': '#999999',
 }
 
-DIR_DOMAIN = ['MPS','CSE','ENG','GEO','EDU','BIO','TIP','SBE','O/D']
+DIR_DOMAIN = ['MPS','CSE','ENG','GEO','EDU','BIO','SBE', 'TIP','O/D']
 DIR_RANGE  = [directorate_colors[k] for k in DIR_DOMAIN]
 DIR_SCALE  = alt.Scale(domain=DIR_DOMAIN, range=DIR_RANGE)
 
@@ -234,8 +234,8 @@ def create_choropleth_map(year_data, selected_year, min_grants, max_grants, stat
             title=f'Number of Grants ({selected_year})',
             legend=alt.Legend(orient='bottom')
         ),
-        strokeWidth=alt.condition(state_selection, alt.value(3), alt.value(0.5)),
-        stroke=alt.condition(state_selection, alt.value('#ff6600'), alt.value('darkgray')),
+        strokeWidth=alt.condition(state_selection, alt.value(4), alt.value(1)),
+        stroke=alt.condition(state_selection, alt.value("#FFC067"), alt.value("white")),
         tooltip=[
             alt.Tooltip('state:N', title='State'),
             alt.Tooltip('state_name:N', title='State Name'),
@@ -272,8 +272,8 @@ def create_choropleth_map(year_data, selected_year, min_grants, max_grants, stat
     pr_circle = alt.Chart(pr_data).mark_circle(size=400, stroke='white', strokeWidth=2).encode(
         longitude='longitude:Q', latitude='latitude:Q',
         color=alt.Color('num_grants:Q', scale=alt.Scale(scheme='blues', domain=[min_grants, max_grants]), legend=None),
-        strokeWidth=alt.condition(state_selection, alt.value(4), alt.value(2)),
-        stroke=alt.condition(state_selection, alt.value('#ff6600'), alt.value('white')),
+        strokeWidth=alt.condition(state_selection, alt.value(4), alt.value(0.5)),
+        stroke=alt.condition(state_selection, alt.value('#FFC067'), alt.value('white')),
         tooltip=[alt.Tooltip('state:N', title='State'), alt.Tooltip('num_grants:Q', title='Total Grants', format=',')]
     ).project(type='albersUsa')
 
@@ -281,7 +281,13 @@ def create_choropleth_map(year_data, selected_year, min_grants, max_grants, stat
     map_chart = (choropleth + leader_lines + state_labels + pr_circle).properties(
         width=MAP_WIDTH,
         height=230,
-        title='Grants Distribution by State'
+        title=alt.TitleParams(
+            text="NSF Grants by State: Political Alignment Analysis",
+            subtitle="Click to select a state, shift-click to multiselect, double-click to clear selection",
+            fontSize=16,
+            anchor="middle",
+            align="center",
+        )
     )
     
     return map_chart
@@ -344,7 +350,7 @@ def create_directorate_evolution_chart(directorate_data):
         color=alt.Color(
             'directorate:N',
             title='Directorate',
-            scale=DIR_SCALE, legend=alt.Legend(title='Directorate', orient='bottom', offset=-5)
+            scale=DIR_SCALE, legend=alt.Legend(title='Directorate', orient='right', offset=2)
         )
     )
 
@@ -435,7 +441,7 @@ def create_termination_impact_chart(termination_impact_df):
             'terminated_grants:Q',
             title='Value'
         ),
-        color=alt.Color('directorate:N', scale=DIR_SCALE, title='Directorate', legend=alt.Legend(title='Directorate', orient='bottom'))
+        color=alt.Color('directorate:N', scale=DIR_SCALE, title='Directorate', legend=None)
         ,
         tooltip=[
             alt.Tooltip('directorate:N', title='Directorate'),
@@ -654,7 +660,7 @@ def create_lifecycle_line_chart(lifecycle_df, state_selection):
     chart = (all_layer + all_label + selected_lines + end_labels).add_params(
         state_selection
     ).properties(
-        title=alt.TitleParams(text=title_expr, fontSize=16, anchor="middle", align="center"),
+        title=alt.TitleParams(text=title_expr, subtitle="When multiple states are selected, hover over a state to highlight its line",fontSize=16, anchor="middle", align="center"),
         width=CHART_WIDTH,
         height=CHART_HEIGHT,
     )
@@ -728,7 +734,7 @@ def create_terminated_bar_chart(terminated_data, state_selection):
         .transform_filter("datum.State != 'All States'")
     )
 
-    title_expr = alt.expr("length(data('state_select_store')) > 0 ? 'Number of terminated grants for the selected states' : 'Number of terminated grants for all states'")
+    title_expr = alt.expr("length(data('state_select_store')) > 0 ? 'Number of terminated grants for the selected states in 2025' : 'Number of terminated grants for all states in 2025'")
 
     chart = (all_layer + selected_layer).properties(
         title=alt.TitleParams(text=title_expr, fontSize=16, anchor="middle", align="center"),
@@ -910,6 +916,7 @@ def create_political_scatter(source_df, selected_year):
             height=MAP_HEIGHT,
             title=alt.TitleParams(
                 text="NSF Grants by State: Political Alignment Analysis",
+                subtitle="Hover to see state trajectory over time.",
                 fontSize=16,
                 anchor="middle",
                 align="center",
@@ -947,7 +954,8 @@ def final_vis(df, grants_by_state, lifecycle_df, directorate_data, termination_i
         fields=['state'],
         on='click',
         toggle='event.shiftKey',
-        clear='dblclick'
+        clear='dblclick',
+        empty='none'
     )
 
     # 1. CHOROPLETH MAP (State Selector)
@@ -964,7 +972,9 @@ def final_vis(df, grants_by_state, lifecycle_df, directorate_data, termination_i
 
     # 5. TERMINATED GRANTS BAR CHART (Left of map, linked to selection)
     # Filter to only states with terminated grants > 0 and sort by terminated_grants
-    terminated_data = year_data[year_data['terminated_grants'] > 0].copy()
+    # Always use 2025 data for terminated grants chart
+    terminated_data = grants_by_state[grants_by_state['year'] == 2025].copy()
+    terminated_data = terminated_data[terminated_data['terminated_grants'] > 0]
     
     # Add All States total
     total_terminated = terminated_data['terminated_grants'].sum()
@@ -991,8 +1001,8 @@ def final_vis(df, grants_by_state, lifecycle_df, directorate_data, termination_i
     dashboard = (column_1 | column_2 | column_3).properties(
         title=alt.TitleParams(
             text=f'NSF Grants Dashboard ({selected_year})',
-            subtitle='Click a state on the map to filter (Shift+Click for multi-select, double-click to reset)',
-            fontSize=18,
+            subtitle="Explore NSF grant data and termination patterns",
+            fontSize=30,
             anchor='middle',
             offset=20
         ),

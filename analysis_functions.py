@@ -231,7 +231,7 @@ def create_choropleth_map(year_data, selected_year, min_grants, max_grants, stat
         color=alt.Color(
             'num_grants:Q',
             scale=alt.Scale(scheme='blues', domain=[min_grants, max_grants]),
-            title=f'Number of Grants ({selected_year})',
+            title=f'Number of Grants',
             legend=alt.Legend(orient='bottom')
         ),
         strokeWidth=alt.condition(state_selection, alt.value(4), alt.value(1)),
@@ -282,7 +282,7 @@ def create_choropleth_map(year_data, selected_year, min_grants, max_grants, stat
         width=MAP_WIDTH,
         height=230,
         title=alt.TitleParams(
-            text="NSF Grants by State: Political Alignment Analysis",
+            text="NSF Grants by State: Political Alignment Analysis in {}".format(selected_year),
             subtitle="Click to select a state, shift-click to multiselect, double-click to clear selection",
             fontSize=16,
             anchor="middle",
@@ -1000,13 +1000,13 @@ def final_vis(df, grants_by_state, lifecycle_df, directorate_data, termination_i
     # Combine columns horizontally
     dashboard = (column_1 | column_2 | column_3).properties(
         title=alt.TitleParams(
-            text=f'NSF Grants Dashboard ({selected_year})',
+            text=f'NSF Grants Dashboard',
             subtitle="Explore NSF grant data and termination patterns",
             fontSize=30,
             anchor='middle',
             offset=20
         ),
-        padding={'left': 40, 'right': 40, 'top': 10, 'bottom': 10}
+        padding={'left': 40, 'right': 40, 'top': 10, 'bottom': 20}
     ).configure_view(
         strokeWidth=0
     ).configure_concat(

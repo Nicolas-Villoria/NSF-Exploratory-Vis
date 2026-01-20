@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Script to concatenate all yearly grant CSV files and add a year column.
 """
@@ -16,14 +15,9 @@ def combine_yearly_grants(base_dir: str, output_file: str):
         output_file: Path to the output combined CSV file
     """
     base_path = Path(base_dir)
-    years = ['2020', '2021', '2022', '2023', '2024', '2025']
+    years = ['2016', '2017', '2018', '2019', '2020', '2021', '2022', '2023', '2024', '2025']
     
     all_dataframes = []
-    
-    print("=" * 80)
-    print("Combining NSF Grants CSV Files")
-    print("=" * 80)
-    print()
     
     for year in years:
         csv_file = base_path / f"grants_{year}.csv"
@@ -56,19 +50,6 @@ def combine_yearly_grants(base_dir: str, output_file: str):
     
     print(f"Writing combined data to {output_file}...")
     combined_df.to_csv(output_file, index=False)
-    
-    print(f"✓ Successfully created {output_file}")
-    print()
-    
-    # Print summary statistics
-    print("Summary by Year:")
-    print("-" * 40)
-    year_counts = combined_df['year'].value_counts().sort_index()
-    for year, count in year_counts.items():
-        print(f"  {year}: {count:,} grants")
-    
-    print()
-    print("=" * 80)
 
 
 def main():

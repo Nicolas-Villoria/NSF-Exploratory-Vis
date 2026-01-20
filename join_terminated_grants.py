@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Script to join all_grants_combined.csv with NSF-Terminated-Awards.csv
 and add a 'terminated' column to indicate if a grant has been terminated.
@@ -17,11 +16,6 @@ def join_terminated_grants(base_dir: str):
     """
     base_path = Path(base_dir)
     
-    print("=" * 80)
-    print("Joining Grants with Terminated Awards Data")
-    print("=" * 80)
-    print()
-    
     # Read the combined grants file
     print("Reading all_grants_combined.csv...")
     grants_file = base_path / "all_grants_combined.csv"
@@ -33,9 +27,6 @@ def join_terminated_grants(base_dir: str):
     print("Reading NSF-Terminated-Awards.csv...")
     terminated_file = base_path / "NSF-Terminated-Awards.csv"
     
-    # The file has some formatting issues - skip the first row which has the export date
-    # and use the actual header
-    # Try different encodings to handle special characters
     try:
         terminated_df = pd.read_csv(terminated_file, encoding='utf-8')
     except UnicodeDecodeError:
@@ -66,17 +57,6 @@ def join_terminated_grants(base_dir: str):
     output_file = base_path / "all_grants_with_termination.csv"
     print(f"Saving joined data to {output_file}...")
     grants_df.to_csv(output_file, index=False)
-    
-    print(f"✓ Successfully created {output_file.name}")
-    print()
-    
-    # Print summary statistics
-    print("Summary:")
-    print("-" * 40)
-    print(f"Total grants: {len(grants_df):,}")
-    print(f"Terminated grants: {num_terminated:,} ({num_terminated/len(grants_df)*100:.2f}%)")
-    print(f"Active grants: {len(grants_df) - num_terminated:,} ({(len(grants_df) - num_terminated)/len(grants_df)*100:.2f}%)")
-    print()
     
     # Show breakdown by year
     print("Terminated Grants by Year:")

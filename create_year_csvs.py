@@ -1,13 +1,11 @@
-#!/usr/bin/env python3
 """
 Script to process NSF grant JSON files and create CSV documents for each year.
-This script reads all JSON files from year directories (2021-2025) and extracts
+This script reads all JSON files from year directories (2016-2025) and extracts
 relevant grant information into CSV format.
 """
 
 import json
 import csv
-import os
 from pathlib import Path
 from typing import Dict, List, Any
 
@@ -179,26 +177,19 @@ def main():
     # Get the base directory (where this script is located)
     base_dir = Path(__file__).parent
     
-    years = ['2020', '2021', '2022', '2023', '2024', '2025']
+    years = ['2016', '2017', '2018', '2019', '2020', '2021', '2022', '2023', '2024', '2025']
     
     total_grants = 0
-    
-    print("=" * 80)
-    print("NSF Grants CSV Generation")
-    print("=" * 80)
-    print()
     
     for year in years:
         year_dir = base_dir / year
         output_csv = base_dir / f"grants_{year}.csv"
-        
+        print('Processing year: ', year)
+
         count = process_year_directory(str(year_dir), str(output_csv))
         total_grants += count
         print()
-    
-    print("=" * 80)
-    print(f"Total grants processed: {total_grants}")
-    print("=" * 80)
+        print(year, 'processed successfully')
 
 
 if __name__ == "__main__":

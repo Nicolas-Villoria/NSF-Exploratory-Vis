@@ -1,6 +1,6 @@
 """
 Analysis Functions for NSF Grants Explorer
-Contains all visualization and question-answering functions for Streamlit app
+Contains the visualizations for Streamlit app 
 """
 
 import pandas as pd
@@ -35,11 +35,11 @@ def white_theme():
 alt.themes.register('white_theme', white_theme)
 alt.themes.enable('white_theme')
 
-# Chart dimension constants for consistent sizing
-CHART_WIDTH = 350
-CHART_HEIGHT = 280
-MAP_WIDTH = 400
-MAP_HEIGHT = 300
+# Chart dimension constants for consistent sizing 
+CHART_WIDTH = 500
+CHART_HEIGHT = 400
+MAP_WIDTH = 600
+MAP_HEIGHT = 400
 
 
 # DATA LOADING FUNCTIONS
@@ -280,7 +280,7 @@ def create_choropleth_map(year_data, selected_year, min_grants, max_grants, stat
     # Combine all layers
     map_chart = (choropleth + leader_lines + state_labels + pr_circle).properties(
         width=MAP_WIDTH,
-        height=230,
+        height=MAP_HEIGHT,
         title=alt.TitleParams(
             text="NSF Grants by State: Political Alignment Analysis in {}".format(selected_year),
             subtitle="Click to select a state, shift-click to multiselect, double-click to clear selection",
@@ -317,7 +317,7 @@ def prepare_directorate_data(df):
                 'terminated_grants': terminated_count
             })
     
-    # Add "All years" aggregation
+    # "All years" aggregation
     for directorate in df['dir_abbr'].unique():
         dir_df = df[df['dir_abbr'] == directorate]
         directorate_results.append({
@@ -388,7 +388,7 @@ def create_directorate_evolution_chart(directorate_data):
         line, selectors, points, rules, text
     ).properties(
         width=CHART_WIDTH,
-        height=255,
+        height=CHART_HEIGHT,
         title=alt.TitleParams('Evolution of Number of Active Grants by Directorate', color='black', fontSize=16, anchor='middle', align='center')
     )
 
@@ -513,7 +513,6 @@ def prepare_lifecycle_data_with_statecode(df):
     active_counts_long.loc[active_counts_long['inst_state_name'] == 'Allstates', 'inst_state_code'] = 'Allstates'
 
     # Rename columns to match create_lifecycle_line_chart expectations
-    # Expected: Date, State, state_code, Active Grants
     active_counts_long = active_counts_long.rename(columns={
         'date': 'Date',
         'inst_state_name': 'State',
@@ -941,7 +940,6 @@ def final_vis(df, grants_by_state, lifecycle_df, directorate_data, termination_i
         selected_year: Year to display on the choropleth (from sidebar)
     """
     alt.data_transformers.enable('vegafusion')
-    # alt.data_transformers.disable_max_rows() # VegaFusion handles large data automatically
 
     # Filter data for selected year
     year_data = grants_by_state[grants_by_state['year'] == selected_year].copy()
@@ -971,8 +969,6 @@ def final_vis(df, grants_by_state, lifecycle_df, directorate_data, termination_i
     lifecycle_line = create_lifecycle_line_chart(lifecycle_df, state_selection)
 
     # 5. TERMINATED GRANTS BAR CHART (Left of map, linked to selection)
-    # Filter to only states with terminated grants > 0 and sort by terminated_grants
-    # Always use 2025 data for terminated grants chart
     terminated_data = grants_by_state[grants_by_state['year'] == 2025].copy()
     terminated_data = terminated_data[terminated_data['terminated_grants'] > 0]
     

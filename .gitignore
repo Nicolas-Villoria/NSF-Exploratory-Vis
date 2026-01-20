@@ -1,6 +1,5 @@
 .mypy_cache/
 .venv/
 
-nsf_data_clean.csv
 all_grants_with_termination_1.csv
 TutorialIntroductionDataVisualizationPart3_Interaction.ipynb

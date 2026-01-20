@@ -69,11 +69,13 @@ streamlit run Fontanals_Villoria_streamlit.py
 
 The app will open in your browser. Use the sidebar to select a year and click on states to filter the dashboard.
 
-## Future Improvements
+## Complementary project and improvements
+This is the second part of the Information Visualisation course project. In the first one (NSF-Grant-Termination-Analysis-Dashboard) we could see:
 
-There are a few directions we would explore with more time:
+1. Institution-level drill-down so users could see which institutions lost the most funding.
+2. Keyword and topic extraction from grant abstracts to identify which research themes were most affected.
+3. Comparison between termination and reinstatement rates for grants on Ted Cruz's "wasteful spending" list.
 
-1. Add institution-level drill-down so users can see which universities lost the most funding.
-2. Include keyword or topic extraction from grant abstracts to identify which research themes were most affected.
-3. Automate data refresh by pulling from the NSF API instead of relying on manual CSV exports.
-4. Add export functionality so users can download filtered data for their own analysis.
+Some further improvements after terminating the project could be the following:
+1. Automate data refresh by pulling from the NSF API instead of relying on manual CSV exports.
+2. Add export functionality so users can download filtered data for their own analysis.
